@@ -10,8 +10,9 @@ public enum InfectedState
 
 public class Infected : MonoBehaviour
 {
+    GameManager gameManager;
     private const float AutoSpeed = 3;
-    private const float ManagedSpeed = 10;
+    private const float ManagedSpeed = 15;
     public InfectedState State {get;set;} = InfectedState.Auto;
     Rigidbody2D rb2D;
     List<RaycastHit2D> hits = new List<RaycastHit2D>(10);
@@ -19,37 +20,30 @@ public class Infected : MonoBehaviour
     ContactFilter2D contactFilter = new ContactFilter2D();
 
     [SerializeField] float speed;
-    private Vector2 _dir = Vector2.right;
-    private Vector2 Dir {
-        get {return _dir;} 
-        set { 
-            _dir = value; 
-            /*var v3Dir = new Vector3(_dir.x, _dir.y, 0);
-            var v3DirZ = new Vector3(0, 0, -1);
-            transform.rotation = Quaternion.LookRotation(v3Dir, v3DirZ)*/;
-        }
-    }
 
     void Start()
     {
+        gameManager = GameManager.GetInstance();
         rb2D = GetComponent<Rigidbody2D>();
     }
-/* var dir = WorldPos - transform.position;
- var angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
- transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward); */
+
     void Update()
+    {
+
+    }
+    void FixedUpdate()
     {
         switch(State)
         {
             case InfectedState.Auto:
                 MoveAuto();
                 break;
+            case InfectedState.Managed:
+                MoveManaged();
+                break;
             default: 
                 break;
         }
-    }
-    void FixedUpdate()
-    {
         if (Input.anyKeyDown)
         {
             if (Input.GetKeyDown(KeyCode.Space)){
@@ -58,10 +52,29 @@ public class Infected : MonoBehaviour
         }
     }
 
+    private void MoveManaged()
+    {
+        if (Input.anyKey){
+            var x = Input.GetAxis("Horizontal");
+            var y = Input.GetAxis("Vertical");
+
+            var deltaPos = transform.TransformVector(new Vector3(x,y,0) * ManagedSpeed * Time.deltaTime);
+            var newPos = transform.position + deltaPos;
+            var angle = Vector2.Angle(transform.right, deltaPos);
+            //transform.right = newPos - transform.position;
+            //var angle = Mathf.Atan2(deltaPos.y, deltaPos.x) * Mathf.Rad2Deg;
+            //transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
+            //transform.rotation = Quaternion.Euler(0f, 0f, angle - 90);
+            //transform.LookAt(newPos, new Vector3(0,0,-1));
+            rb2D.MovePosition(newPos);
+            Quaternion toRotation = Quaternion.FromToRotation(transform.right, deltaPos);
+            transform.localRotation = toRotation;
+        }
+    }
     private void MoveAuto()
     {
-        var deltaPos = Dir * speed * Time.deltaTime;
-        var newPos = transform.position + new Vector3(deltaPos.x, deltaPos.y,0);
+        var deltaPos = Vector2.right * speed * Time.deltaTime;
+        var newPos = transform.position + transform.TransformVector(new Vector3(deltaPos.x, deltaPos.y,0));
         rb2D.MovePosition(newPos);
     }
 
@@ -79,15 +92,13 @@ public class Infected : MonoBehaviour
 
     void NextDir()
     {
-        if (Dir == Vector2.up){
-            Dir = Vector2.right;
-        } else if(Dir == Vector2.right){
-            Dir = Vector2.down;
-        } else if (Dir == Vector2.down){
-            Dir = Vector2.left;
-        } else if (Dir == Vector2.left){
-            Dir = Vector2.up;
-        }
+        transform.Rotate(0,0,-90);
+        return;
+    }
+
+    void OnMouseDown()
+    {
+        gameManager.SetNewManaged(this);
     }
     private void RaycastEnemy()
     {
