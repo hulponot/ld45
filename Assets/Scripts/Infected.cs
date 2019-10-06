@@ -11,13 +11,13 @@ public enum InfectedState
 public class Infected : MonoBehaviour
 {
     GameManager gameManager;
-    private const float AutoSpeed = 3;
     private const float ManagedSpeed = 15;
     public InfectedState State {get;set;} = InfectedState.Auto;
     Rigidbody2D rb2D;
     List<RaycastHit2D> hits = new List<RaycastHit2D>(10);
     float _distance = 100f;
     ContactFilter2D contactFilter = new ContactFilter2D();
+    private int health = 3;
 
     [SerializeField] float speed;
 
@@ -44,12 +44,6 @@ public class Infected : MonoBehaviour
             default: 
                 break;
         }
-        if (Input.anyKeyDown)
-        {
-            if (Input.GetKeyDown(KeyCode.Space)){
-                RaycastEnemy();
-            }
-        }
     }
 
     private void MoveManaged()
@@ -58,17 +52,19 @@ public class Infected : MonoBehaviour
             var x = Input.GetAxis("Horizontal");
             var y = Input.GetAxis("Vertical");
 
-            var deltaPos = transform.TransformVector(new Vector3(x,y,0) * ManagedSpeed * Time.deltaTime);
+            var deltaPos = new Vector3(x,y,0) * ManagedSpeed * Time.deltaTime;
             var newPos = transform.position + deltaPos;
-            var angle = Vector2.Angle(transform.right, deltaPos);
             //transform.right = newPos - transform.position;
             //var angle = Mathf.Atan2(deltaPos.y, deltaPos.x) * Mathf.Rad2Deg;
             //transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
             //transform.rotation = Quaternion.Euler(0f, 0f, angle - 90);
             //transform.LookAt(newPos, new Vector3(0,0,-1));
             rb2D.MovePosition(newPos);
-            Quaternion toRotation = Quaternion.FromToRotation(transform.right, deltaPos);
-            transform.localRotation = toRotation;
+
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                gameManager.UseSpores(transform.position);
+            }
         }
     }
     private void MoveAuto()
@@ -78,8 +74,22 @@ public class Infected : MonoBehaviour
         rb2D.MovePosition(newPos);
     }
 
+    public void Damaged (){
+        health--;
+        Debug.Log(health);
+        if (IsDead()){
+            gameManager.InfetedDead(this);
+        }
+    }
+    public bool IsDead(){
+        return health <=0;
+    }
+    public int GetHealth(){
+        return health;
+    }
     void OnCollisionEnter2D(Collision2D collision)
     {
+        if (State == InfectedState.Managed) return;
         var go = collision.gameObject;
         if (go.tag == "Wall"){
             NextDir();
@@ -103,7 +113,7 @@ public class Infected : MonoBehaviour
     private void RaycastEnemy()
     {
         //public static int Raycast(Vector2 origin, Vector2 direction, ContactFilter2D contactFilter, List<RaycastHit2D> results, float distance = Mathf.Infinity); 
-        int results = Physics2D.Raycast(transform.position, Vector2.right, contactFilter.NoFilter(), hits, _distance);
+        int results = Physics2D.Raycast(transform.position, transform.right, contactFilter.NoFilter(), hits, _distance);
 
         for (int i=0;i<results;i++)
         {

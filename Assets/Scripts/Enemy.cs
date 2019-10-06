@@ -1,55 +1,80 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 public class Enemy : MonoBehaviour
 {
     GameManager gameManager;
+
     Rigidbody2D rb2D;
     List<RaycastHit2D> hits = new List<RaycastHit2D>(10);
-
+    ContactFilter2D contactFilter = new ContactFilter2D();
+    public float _distance = 80;
     private Infected target;
+    private List<Infected> nearInfected = new List<Infected>(15);
+
+    public float IntencityOfAttack = 1f;
+    private DateTime lastAttack;
+    private Animator anima;
+    int wallMask;
+    AudioSource m_MyAudioSource;
     void Start()
     {
         gameManager = GameManager.GetInstance();
         rb2D = GetComponent<Rigidbody2D>();
+        wallMask = LayerMask.GetMask("Wall");
+        lastAttack = DateTime.Now;
+        anima = GetComponent<Animator>();
+        m_MyAudioSource = GetComponent<AudioSource>();        
+
     }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
-        
+        RaycastEnemy();
+        if (target != null){
+            transform.right = target.transform.position - transform.position;
+            if ((DateTime.Now - lastAttack).TotalSeconds > IntencityOfAttack){
+                Attack();
+            }
+        }
+    }
+
+    private void Attack(){
+        lastAttack = DateTime.Now;
+        anima.SetTrigger("pew");
+        m_MyAudioSource.Play();
+        target.Damaged();
     }
 
     private void RaycastEnemy()
     {
-        int results = Physics2D.CircleCastAll(transform.position, Vector2.right, contactFilter.NoFilter(), hits, _distance);
+        nearInfected.Clear();
+        target = null;
+        var colliders = Physics2D.OverlapCircleAll(transform.position, _distance);
+        for (int i=0;i< colliders.Length;i++){
+            var infected = colliders[i].GetComponent<Infected>();
+            if (infected == null)
+                continue;
+            nearInfected.Add(infected);
+        }
+        if (nearInfected.Count > 0) Debug.Log(nearInfected.Count);
+        if (nearInfected.Count > 0){
+            for (int i=0;i< nearInfected.Count;i++){
+                var walls = Physics2D.Linecast(transform.position, nearInfected[i].transform.position, wallMask);
+                
+                if (walls.collider == null){
 
-        for (int i=0;i<results;i++)
-        {
-            if(hits[i].collider != null)
-            {
-                var go = hits[i].collider.gameObject;
-                if (go.tag == "Wall") break;
-
-                go.SetActive(false);
+                    if (target == null 
+                        || Vector3.Distance(transform.position, target.transform.position)
+                            > 
+                            Vector3.Distance(transform.position, nearInfected[i].transform.position)){
+                                target = nearInfected[i];
+                            }
+                }
             }
         }
-        /*
-        if (hit.collider != null)
-        {
-            // Calculate the distance from the surface and the "error" relative
-            // to the floating height.
-            float distance = Mathf.Abs(hit.point.y - transform.position.y);
-            float heightError = floatHeight - distance;
-
-            // The force is proportional to the height error, but we remove a part of it
-            // according to the object's speed.
-            float force = liftForce * heightError - rb2D.velocity.y * damping;
-
-            // Apply the force to the rigidbody.
-            rb2D.AddForce(Vector3.up * force);
-        }
-        */
     }
 }
